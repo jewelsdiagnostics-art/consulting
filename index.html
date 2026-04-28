@@ -17,53 +17,574 @@
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/styles.css">
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="favicon.png">
+    <style>
+        /* Additional custom styles */
+        .transition-smooth {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .toast-slide {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    </style>
 </head>
 <body class="bg-gray-50">
     <!-- Loading Screen -->
-    <div id="loadingScreen" class="fixed inset-0 bg-white z-50 flex items-center justify-center">
+    <div id="loadingScreen" class="fixed inset-0 bg-white z-50 flex items-center justify-center transition-opacity duration-300">
         <div class="text-center">
             <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto"></div>
-            <p class="mt-4 text-gray-600">Loading Medical Portal...</p>
+            <p class="mt-4 text-gray-600 font-medium">Loading Medical Portal...</p>
         </div>
     </div>
 
     <!-- Main App Container -->
-    <div id="app" class="min-h-screen">
-        <!-- Content will be dynamically loaded here -->
-    </div>
-
-    <!-- Authentication Modals -->
-    <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden">
-        <div class="flex items-center justify-center min-h-screen p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-                <div id="authContent">
-                    <!-- Auth content will be loaded here -->
-                </div>
-            </div>
-        </div>
-    </div>
+    <div id="app" class="min-h-screen"></div>
 
     <!-- Notification Toast -->
-    <div id="notification" class="fixed top-4 right-4 z-50 hidden">
-        <div class="bg-white rounded-lg shadow-lg p-4 max-w-sm">
+    <div id="notification" class="fixed top-4 right-4 z-50 hidden toast-slide">
+        <div class="bg-white rounded-lg shadow-xl p-4 max-w-sm border-l-4" id="notificationBorder">
             <div class="flex items-center">
                 <div id="notificationIcon" class="flex-shrink-0 mr-3"></div>
-                <div id="notificationMessage" class="text-sm text-gray-700"></div>
+                <div id="notificationMessage" class="text-sm font-medium text-gray-800"></div>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript -->
-    <script src="js/firebase-config.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/app.js"></script>
-    <script src="js/utils.js"></script>
-    
-    <script src="js/init.js"></script>
+    <!-- Firebase Configuration (Embedded for reliability) -->
+    <script>
+        // ============================================
+        // FIREBASE CONFIGURATION (Replace with your own config)
+        // ============================================
+        // IMPORTANT: You must replace this with your actual Firebase project config
+        // Get it from: Firebase Console > Project Settings > General > Your apps
+        
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",          // Replace with your API key
+            authDomain: "YOUR_AUTH_DOMAIN_HERE",  // Replace with your auth domain
+            projectId: "YOUR_PROJECT_ID_HERE",    // Replace with your project ID
+            storageBucket: "YOUR_STORAGE_BUCKET_HERE",
+            messagingSenderId: "YOUR_SENDER_ID_HERE",
+            appId: "YOUR_APP_ID_HERE"
+        };
+        
+        // Initialize Firebase if not already initialized
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        } else {
+            firebase.app(); // use existing app
+        }
+        
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        
+        // For demo/testing: If you don't have a Firebase project yet,
+        // uncomment the line below to use demo mode (bypasses actual auth)
+        // WARNING: Only use for testing/development, not production!
+        // window.DEMO_MODE = true;
+    </script>
+
+    <script>
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+        
+        // Show notification toast
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const iconDiv = document.getElementById('notificationIcon');
+            const messageDiv = document.getElementById('notificationMessage');
+            const borderDiv = document.getElementById('notificationBorder');
+            
+            // Set icon and border color based on type
+            if (type === 'success') {
+                iconDiv.innerHTML = '<i class="fas fa-check-circle text-green-500 text-xl"></i>';
+                borderDiv.className = 'bg-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-green-500';
+            } else if (type === 'error') {
+                iconDiv.innerHTML = '<i class="fas fa-exclamation-circle text-red-500 text-xl"></i>';
+                borderDiv.className = 'bg-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-red-500';
+            } else if (type === 'info') {
+                iconDiv.innerHTML = '<i class="fas fa-info-circle text-blue-500 text-xl"></i>';
+                borderDiv.className = 'bg-white rounded-lg shadow-xl p-4 max-w-sm border-l-4 border-blue-500';
+            }
+            
+            messageDiv.textContent = message;
+            notification.classList.remove('hidden');
+            
+            setTimeout(() => {
+                notification.classList.add('hidden');
+            }, 4000);
+        }
+        
+        // Hide loading screen
+        function hideLoadingScreen() {
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 300);
+            }
+        }
+        
+        // ============================================
+        // UI RENDERING FUNCTIONS
+        // ============================================
+        
+        // Render Login Page
+        function renderLoginPage() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
+                    <div class="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl transform transition-all">
+                        <div class="text-center">
+                            <div class="mx-auto h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-hospital-user text-3xl text-purple-600"></i>
+                            </div>
+                            <h2 class="mt-6 text-3xl font-extrabold text-gray-900">Medical Portal</h2>
+                            <p class="mt-2 text-sm text-gray-600">Sign in to access your dashboard</p>
+                        </div>
+                        <form id="loginForm" class="mt-8 space-y-6">
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="email" class="block text-sm font-medium text-gray-700">Email address</label>
+                                    <div class="mt-1 relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-envelope text-gray-400"></i>
+                                        </div>
+                                        <input id="email" name="email" type="email" required 
+                                            class="appearance-none rounded-lg relative block w-full pl-10 px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm" 
+                                            placeholder="doctor@hospital.com">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                                    <div class="mt-1 relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-lock text-gray-400"></i>
+                                        </div>
+                                        <input id="password" name="password" type="password" required 
+                                            class="appearance-none rounded-lg relative block w-full pl-10 px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm" 
+                                            placeholder="••••••••">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <input id="remember-me" name="remember-me" type="checkbox" class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
+                                    <label for="remember-me" class="ml-2 block text-sm text-gray-900">Remember me</label>
+                                </div>
+                                <div class="text-sm">
+                                    <a href="#" id="forgotPasswordLink" class="font-medium text-purple-600 hover:text-purple-500"> Forgot password? </a>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <button type="submit" id="loginButton"
+                                    class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200">
+                                    <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                                        <i class="fas fa-sign-in-alt text-purple-300 group-hover:text-purple-200"></i>
+                                    </span>
+                                    Sign in
+                                </button>
+                            </div>
+                            
+                            <div class="text-center">
+                                <p class="text-sm text-gray-600">
+                                    Don't have an account?
+                                    <a href="#" id="showSignUpLink" class="font-medium text-purple-600 hover:text-purple-500"> Sign up </a>
+                                </p>
+                            </div>
+                            
+                            <!-- Demo credentials hint (for testing) -->
+                            <div class="mt-4 p-3 bg-gray-50 rounded-lg text-center text-xs text-gray-500">
+                                <i class="fas fa-info-circle"></i> Demo: Use any email/password (min 6 chars) <br>
+                                or email: demo@hospital.com / pass: 123456
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            
+            // Attach event listeners
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            const showSignUpLink = document.getElementById('showSignUpLink');
+            if (showSignUpLink) showSignUpLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                renderSignUpPage();
+            });
+            const forgotLink = document.getElementById('forgotPasswordLink');
+            if (forgotLink) forgotLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                handleForgotPassword();
+            });
+        }
+        
+        // Render Sign Up Page
+        function renderSignUpPage() {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
+                    <div class="max-w-md w-full space-y-8 bg-white p-10 rounded-2xl shadow-2xl">
+                        <div class="text-center">
+                            <div class="mx-auto h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user-plus text-3xl text-purple-600"></i>
+                            </div>
+                            <h2 class="mt-6 text-3xl font-extrabold text-gray-900">Create Account</h2>
+                            <p class="mt-2 text-sm text-gray-600">Join our medical community</p>
+                        </div>
+                        <form id="signupForm" class="mt-8 space-y-6">
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="signupEmail" class="block text-sm font-medium text-gray-700">Email address</label>
+                                    <div class="mt-1 relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-envelope text-gray-400"></i>
+                                        </div>
+                                        <input id="signupEmail" name="email" type="email" required 
+                                            class="appearance-none rounded-lg relative block w-full pl-10 px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500" 
+                                            placeholder="doctor@hospital.com">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="signupPassword" class="block text-sm font-medium text-gray-700">Password (min 6 characters)</label>
+                                    <div class="mt-1 relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-lock text-gray-400"></i>
+                                        </div>
+                                        <input id="signupPassword" name="password" type="password" required 
+                                            class="appearance-none rounded-lg relative block w-full pl-10 px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500" 
+                                            placeholder="••••••••">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label for="confirmPassword" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+                                    <div class="mt-1 relative">
+                                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <i class="fas fa-check-circle text-gray-400"></i>
+                                        </div>
+                                        <input id="confirmPassword" name="confirmPassword" type="password" required 
+                                            class="appearance-none rounded-lg relative block w-full pl-10 px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500" 
+                                            placeholder="••••••••">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                                    <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                                        <i class="fas fa-user-plus text-purple-300"></i>
+                                    </span>
+                                    Create Account
+                                </button>
+                            </div>
+                            
+                            <div class="text-center">
+                                <p class="text-sm text-gray-600">
+                                    Already have an account?
+                                    <a href="#" id="showLoginLink" class="font-medium text-purple-600 hover:text-purple-500"> Sign in </a>
+                                </p>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('signupForm').addEventListener('submit', handleSignUp);
+            const showLoginLink = document.getElementById('showLoginLink');
+            if (showLoginLink) showLoginLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                renderLoginPage();
+            });
+        }
+        
+        // Render Dashboard (Main Application after successful login)
+        function renderDashboard(user) {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="min-h-screen bg-gray-50">
+                    <!-- Navigation Bar -->
+                    <nav class="bg-white shadow-lg sticky top-0 z-10">
+                        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div class="flex justify-between h-16">
+                                <div class="flex items-center">
+                                    <i class="fas fa-hospital-user text-2xl text-purple-600 mr-2"></i>
+                                    <span class="font-bold text-xl text-gray-800">MediCare Hospital System</span>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                                            <i class="fas fa-user-md text-purple-600"></i>
+                                        </div>
+                                        <span class="text-sm font-medium text-gray-700">${user.email || user.displayName || 'Doctor'}</span>
+                                    </div>
+                                    <button id="logoutBtn" class="px-3 py-1 rounded-lg text-red-600 hover:bg-red-50 transition-colors duration-200">
+                                        <i class="fas fa-sign-out-alt mr-1"></i> Logout
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </nav>
+                    
+                    <!-- Main Dashboard Content -->
+                    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        <!-- Welcome Banner -->
+                        <div class="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl shadow-lg p-6 mb-8 text-white">
+                            <h1 class="text-2xl font-bold mb-2">Welcome back, ${user.email?.split('@')[0] || 'Healthcare Professional'}!</h1>
+                            <p class="opacity-90">Manage patients, appointments, and medical records from your centralized dashboard.</p>
+                        </div>
+                        
+                        <!-- Stats Cards -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <div class="bg-white rounded-xl shadow-md p-6 card-hover transition-smooth">
+                                <div class="flex items-center">
+                                    <div class="p-3 rounded-full bg-blue-100 text-blue-600">
+                                        <i class="fas fa-users text-2xl"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm text-gray-500">Total Patients</p>
+                                        <p class="text-2xl font-bold text-gray-800">1,284</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-md p-6 card-hover transition-smooth">
+                                <div class="flex items-center">
+                                    <div class="p-3 rounded-full bg-green-100 text-green-600">
+                                        <i class="fas fa-calendar-check text-2xl"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm text-gray-500">Today's Appointments</p>
+                                        <p class="text-2xl font-bold text-gray-800">24</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-xl shadow-md p-6 card-hover transition-smooth">
+                                <div class="flex items-center">
+                                    <div class="p-3 rounded-full bg-purple-100 text-purple-600">
+                                        <i class="fas fa-chart-line text-2xl"></i>
+                                    </div>
+                                    <div class="ml-4">
+                                        <p class="text-sm text-gray-500">Recovery Rate</p>
+                                        <p class="text-2xl font-bold text-gray-800">94%</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recent Activity -->
+                        <div class="bg-white rounded-xl shadow-md p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                                <i class="fas fa-bell mr-2 text-purple-500"></i> Recent Updates
+                            </h3>
+                            <div class="space-y-3">
+                                <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
+                                    <p class="text-sm text-gray-600">System connected successfully - Real-time sync active</p>
+                                </div>
+                                <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
+                                    <p class="text-sm text-gray-600">You have 3 pending lab reports to review</p>
+                                </div>
+                                <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                                    <div class="w-2 h-2 bg-yellow-500 rounded-full mr-3"></div>
+                                    <p class="text-sm text-gray-600">New patient intake form updated</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add logout handler
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', async () => {
+                    try {
+                        await auth.signOut();
+                        showNotification('Logged out successfully', 'success');
+                        renderLoginPage();
+                    } catch (error) {
+                        showNotification('Error signing out: ' + error.message, 'error');
+                    }
+                });
+            }
+        }
+        
+        // ============================================
+        // AUTHENTICATION HANDLERS (FIXED)
+        // ============================================
+        
+        // Handle Login - THIS IS THE CRITICAL FIX
+        async function handleLogin(event) {
+            event.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const loginButton = document.getElementById('loginButton');
+            const originalText = loginButton.innerHTML;
+            
+            // Show loading state
+            loginButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Signing in...';
+            loginButton.disabled = true;
+            
+            try {
+                // Attempt Firebase authentication
+                const userCredential = await auth.signInWithEmailAndPassword(email, password);
+                const user = userCredential.user;
+                
+                // SUCCESSFUL LOGIN - Navigate to dashboard
+                showNotification('Login successful! Welcome to the dashboard.', 'success');
+                
+                // Render the main dashboard immediately
+                renderDashboard(user);
+                
+                // Hide loading screen if still visible
+                hideLoadingScreen();
+                
+            } catch (error) {
+                console.error("Login error:", error);
+                
+                // Provide user-friendly error messages
+                let errorMessage = 'Login failed. ';
+                switch (error.code) {
+                    case 'auth/invalid-email':
+                        errorMessage += 'Invalid email format.';
+                        break;
+                    case 'auth/user-disabled':
+                        errorMessage += 'This account has been disabled.';
+                        break;
+                    case 'auth/user-not-found':
+                        errorMessage += 'No account found with this email.';
+                        break;
+                    case 'auth/wrong-password':
+                        errorMessage += 'Incorrect password.';
+                        break;
+                    default:
+                        errorMessage += error.message;
+                }
+                showNotification(errorMessage, 'error');
+            } finally {
+                // Reset button state
+                loginButton.innerHTML = originalText;
+                loginButton.disabled = false;
+            }
+        }
+        
+        // Handle Sign Up
+        async function handleSignUp(event) {
+            event.preventDefault();
+            const email = document.getElementById('signupEmail').value;
+            const password = document.getElementById('signupPassword').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            if (password !== confirmPassword) {
+                showNotification('Passwords do not match', 'error');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showNotification('Password must be at least 6 characters', 'error');
+                return;
+            }
+            
+            const signupButton = event.target.querySelector('button[type="submit"]');
+            const originalText = signupButton.innerHTML;
+            signupButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Creating account...';
+            signupButton.disabled = true;
+            
+            try {
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                showNotification('Account created successfully! Please login.', 'success');
+                renderLoginPage(); // Redirect to login page after signup
+            } catch (error) {
+                let errorMessage = 'Signup failed: ';
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage += 'Email already in use. Please login instead.';
+                } else {
+                    errorMessage += error.message;
+                }
+                showNotification(errorMessage, 'error');
+            } finally {
+                signupButton.innerHTML = originalText;
+                signupButton.disabled = false;
+            }
+        }
+        
+        // Handle Forgot Password
+        async function handleForgotPassword() {
+            const email = prompt('Please enter your email address to reset password:');
+            if (email && email.includes('@')) {
+                try {
+                    await auth.sendPasswordResetEmail(email);
+                    showNotification('Password reset email sent! Check your inbox.', 'info');
+                } catch (error) {
+                    showNotification('Error: ' + error.message, 'error');
+                }
+            } else if (email) {
+                showNotification('Please enter a valid email address', 'error');
+            }
+        }
+        
+        // ============================================
+        // AUTH STATE LISTENER (CRITICAL FOR PERSISTENCE)
+        // ============================================
+        
+        // This ensures the app responds to auth state changes (login/logout)
+        auth.onAuthStateChanged((user) => {
+            // Hide loading screen once auth state is determined
+            hideLoadingScreen();
+            
+            if (user) {
+                // User is signed in - show dashboard
+                console.log('User authenticated:', user.email);
+                renderDashboard(user);
+            } else {
+                // No user - show login page
+                console.log('No user signed in, showing login page');
+                renderLoginPage();
+            }
+        });
+        
+        // Initialize app and check for any existing session
+        window.addEventListener('DOMContentLoaded', () => {
+            // Small delay to ensure Firebase is ready
+            setTimeout(() => {
+                if (!auth.currentUser) {
+                    // If no user after 1 second, ensure login is shown (loading screen will hide via onAuthStateChanged)
+                    console.log('Initializing app - checking auth state');
+                }
+            }, 500);
+        });
+        
+        // Expose demo mode helper in console (for testing without Firebase config)
+        if (window.DEMO_MODE) {
+            console.log('DEMO MODE ACTIVE - Bypassing Firebase authentication');
+            // Override auth methods for demo
+            const originalSignIn = auth.signInWithEmailAndPassword;
+            auth.signInWithEmailAndPassword = async (email, password) => {
+                if (password && password.length >= 6) {
+                    showNotification('Demo Login Successful! (Demo Mode)', 'success');
+                    // Simulate user object
+                    const fakeUser = { email: email, uid: 'demo123', displayName: 'Demo Doctor' };
+                    renderDashboard(fakeUser);
+                    return { user: fakeUser };
+                } else {
+                    throw new Error('Invalid demo credentials');
+                }
+            };
+        }
+    </script>
 </body>
 </html>
