@@ -1,0 +1,39 @@
+{
+  "name": "hospital-management-web",
+  "version": "1.0.0",
+  "description": "Hospital Management System - Web Application",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx http-server . -p 8080 -o",
+    "build": "echo 'Static site - no build required'",
+    "deploy": "netlify deploy --prod --dir=.",
+    "serve": "python -m http.server 8080",
+    "test": "echo 'No tests specified yet'",
+    "lint": "echo 'No linting configured yet'"
+  },
+  "keywords": [
+    "hospital",
+    "medical",
+    "healthcare",
+    "firebase",
+    "web-app",
+    "responsive"
+  ],
+  "author": "NDE HURICH DILAN",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "netlify-cli": "^17.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/hospital-management-web.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/hospital-management-web/issues"
+  },
+  "homepage": "https://your-site.netlify.app",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
